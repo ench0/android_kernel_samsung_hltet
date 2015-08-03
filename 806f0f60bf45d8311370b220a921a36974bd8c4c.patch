@@ -1,0 +1,56 @@
+From 806f0f60bf45d8311370b220a921a36974bd8c4c Mon Sep 17 00:00:00 2001
+From: Giulio Cervera <giulio.cervera@cyanogenmod.org>
+Date: Tue, 4 Aug 2015 00:16:08 +0200
+Subject: [PATCH] zram: updates from 3.14.y
+
+Change-Id: I783fe7be79b2bc767722eb948acedbea8545bfc3
+---
+ drivers/staging/zram/zram_drv.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/staging/zram/zram_drv.c b/drivers/staging/zram/zram_drv.c
+index 83fa657..164a490 100644
+--- a/drivers/staging/zram/zram_drv.c
++++ b/drivers/staging/zram/zram_drv.c
+@@ -658,24 +658,34 @@ static ssize_t reset_store(struct device *dev,
+ 
+ 	zram = dev_to_zram(dev);
+ 	bdev = bdget_disk(zram->disk, 0);
++	if (!bdev)
++		return -ENOMEM;
+ 
+ 	/* Do not reset an active device! */
+-	if (bdev->bd_holders)
+-		return -EBUSY;
++	if (bdev->bd_holders) {
++		ret = -EBUSY;
++		goto out;
++	}
+ 
+ 	ret = kstrtou16(buf, 10, &do_reset);
+ 	if (ret)
+-		return ret;
++		goto out;
+ 
+-	if (!do_reset)
+-		return -EINVAL;
++	if (!do_reset) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 
+ 	/* Make sure all pending I/O is finished */
+-	if (bdev)
+-		fsync_bdev(bdev);
++	fsync_bdev(bdev);
++	bdput(bdev);
+ 
+ 	zram_reset_device(zram, true);
+ 	return len;
++
++out:
++	bdput(bdev);
++	return ret;
+ }
+ 
+ static void __zram_make_request(struct zram *zram, struct bio *bio, int rw)
